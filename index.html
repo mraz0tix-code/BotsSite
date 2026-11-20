@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Portfolio Bot &amp; Login Alert Bot</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+<script>
+  // Dark by default; follows the system unless the visitor picked a theme.
+  (function () {
+    var saved = null;
+    try { saved = localStorage.getItem('theme'); } catch (e) {}
+    if (saved === 'light' || saved === 'dark') document.documentElement.setAttribute('data-theme', saved);
+  })();
+</script>
+<style>
+  /* Layout: one quiet column. Two-line name, big statement, two bot cards, three tables, the portfolio bot menu, run steps. */
+  :root {
+    color-scheme: dark;
+    --bg: #000000;
+    --surface: #0d0d0f;
+    --text: #ffffff;
+    --muted: #9b9ba5;
+    --line: #232328;
+    --accent: #2563eb;
+    --accent-ink: #60a5fa;
+    --accent-on: #ffffff;
+    --inv-bg: #ffffff;
+    --inv-fg: #000000;
+    --glass: rgba(13, 13, 15, 0.85);
+    --hover-line: rgba(96, 165, 250, 0.45);
+    --shadow: rgba(37, 99, 235, 0.28);
+    --radius: 14px;
+    --ease: cubic-bezier(.2, .7, .2, 1);
+    --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      color-scheme: light;
+      --bg: #f9f9fb;
+      --surface: #ffffff;
+      --text: #000000;
+      --muted: #5c5c66;
+      --line: #e5e5ea;
+      --accent: #2563eb;
+      --accent-ink: #2563eb;
+      --accent-on: #ffffff;
+      --inv-bg: #000000;
+      --inv-fg: #ffffff;
+      --glass: rgba(255, 255, 255, 0.85);
+      --hover-line: rgba(37, 99, 235, 0.35);
+      --shadow: rgba(0, 0, 0, 0.18);
+    }
+  }
+
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --bg: #f9f9fb;
+    --surface: #ffffff;
+    --text: #000000;
+    --muted: #5c5c66;
+    --line: #e5e5ea;
+    --accent: #2563eb;
+    --accent-ink: #2563eb;
+    --accent-on: #ffffff;
+    --inv-bg: #000000;
+    --inv-fg: #ffffff;
+    --glass: rgba(255, 255, 255, 0.85);
+    --hover-line: rgba(37, 99, 235, 0.35);
+    --shadow: rgba(0, 0, 0, 0.18);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .container {
+    width: 100%;
+    max-width: 960px;
+    margin: 0 auto;
+    padding-left: max(24px, env(safe-area-inset-left, 0px));
+    padding-right: max(24px, env(safe-area-inset-right, 0px));
+  }
+
+  /* Controls: theme + language */
+  .controls {
+    position: fixed;
+    top: calc(16px + env(safe-area-inset-top, 0px));
+    right: max(16px, env(safe-area-inset-right, 0px));
+    z-index: 10;
+    display: flex;
+    gap: 8px;
+  }
+
+  .lang, .theme {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 64px;
+    padding: 3px;
+    font-family: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text);
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    cursor: pointer;
+    transition: border-color 0.3s ease;
+  }
+
+  .lang:focus-visible, .theme:focus-visible {
+    outline: 2px solid var(--accent-ink);
+    outline-offset: 3px;
+  }
+
+  .lang-thumb, .theme-thumb {
+    position: absolute;
+    top: 3px;
+    bottom: 3px;
+    left: 3px;
+    width: calc(50% - 3px);
+    background: var(--inv-bg);
+    border-radius: 999px;
+    transition: transform 0.4s var(--ease), background-color 0.45s ease;
+  }
+
+  .theme[aria-checked="true"] .theme-thumb,
+  .lang[data-current="ru"] .lang-thumb { transform: translateX(100%); }
+
+  .lang-opt, .theme-opt {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    color: var(--muted);
+    transition: color 0.35s ease;
+  }
+
+  .lang-opt { padding: 7px 0; line-height: 1; }
+  .lang-opt.is-active { color: var(--inv-fg); }
+
+  .theme-opt svg { width: 15px; height: 15px; }
+
+  /* Sun sits left, moon right. The icon under the thumb takes the thumb's contrast color. */
+  .theme[aria-checked="true"] .sun { color: var(--muted); }
+  .theme[aria-checked="true"] .moon { color: var(--inv-fg); }
+  .theme[aria-checked="false"] .sun { color: var(--inv-fg); }
+  .theme[aria-checked="false"] .moon { color: var(--muted); }
+
+  html.theme-anim *, html.theme-anim *::before, html.theme-anim *::after {
+    transition: background-color 0.45s ease, color 0.45s ease, border-color 0.45s ease,
+                box-shadow 0.45s ease, transform 0.4s var(--ease), opacity 0.22s ease !important;
+  }
+
+  [data-i18n], [data-lines], [data-opt] { transition: opacity 0.22s ease; }
+  .is-fading { opacity: 0; }
+
+  /* Hero */
+  .hero {
+    padding: clamp(104px, 17vw, 176px) 0 clamp(56px, 10vw, 96px);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .hero h1 {
+    font-size: clamp(2.2rem, 9vw, 5.5rem);
+    font-weight: 800;
+    letter-spacing: -0.055em;
+    line-height: 1;
+  }
+
+  .hero h1 span { display: block; }
+  .hero h1 .second { color: var(--muted); }
+
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 28px;
+    padding: 7px 16px;
+    font-size: 0.88rem;
+    font-weight: 500;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+  }
+
+  .tag::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+  }
+
+  /* Sections */
+  section {
+    padding: clamp(48px, 8vw, 80px) 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  h2 {
+    margin-bottom: 24px;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  .about { padding: clamp(64px, 11vw, 128px) 0; }
+
+  .about p {
+    font-size: clamp(1.9rem, 6vw, 4.25rem);
+    font-weight: 800;
+    line-height: 1.08;
+    letter-spacing: -0.04em;
+    overflow-wrap: break-word;
+    text-wrap: balance;
+  }
+
+  /* Menu cards */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .card {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+    padding: 28px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    transition: transform 0.6s var(--ease), box-shadow 0.6s var(--ease), border-color 0.6s ease;
+  }
+
+  .card h3 {
+    font-size: 1.3rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+  }
+
+  .card p { color: var(--muted); font-size: 0.97rem; }
+
+  .card .stack {
+    margin-top: auto;
+    padding-top: 14px;
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    overflow-wrap: anywhere;
+  }
+
+  .card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+    margin-top: 6px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+  }
+
+  .card-meta .count {
+    font-size: 0.88rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .card-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--accent-ink);
+    text-decoration: none;
+  }
+
+  .arrow {
+    display: inline-block;
+    transition: transform 0.35s var(--ease), color 0.35s ease;
+  }
+
+  /* Rows: what's inside */
+  .rows { list-style: none; border-top: 1px solid var(--line); }
+
+  .rows li {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 18px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .rows-label { flex: none; font-size: 0.95rem; color: var(--muted); }
+
+  .rows-value {
+    min-width: 0;
+    font-size: clamp(1rem, 3vw, 1.2rem);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    text-align: right;
+    text-decoration: none;
+    overflow-wrap: anywhere;
+    transition: color 0.35s ease;
+  }
+
+  /* Command table */
+  .table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+
+  th, td {
+    padding: 16px 20px;
+    text-align: left;
+    vertical-align: top;
+    border-bottom: 1px solid var(--line);
+  }
+
+  tr:last-child th, tr:last-child td { border-bottom: none; }
+
+  thead th {
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  tbody th { font-weight: 500; color: var(--muted); }
+
+  td.cmd {
+    font-family: var(--mono);
+    font-size: 0.88rem;
+    white-space: nowrap;
+  }
+
+  td.cmd.wrap { white-space: normal; overflow-wrap: anywhere; }
+
+  td { font-variant-numeric: tabular-nums; }
+
+  /* Main menu + run */
+  .run-text { max-width: 65ch; color: var(--muted); font-size: 0.97rem; }
+  .run-text + .run-text { margin-top: 12px; }
+
+  pre {
+    margin: 0 0 20px;
+    padding: 22px 24px;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 0.95rem;
+    line-height: 1.7;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
+
+  pre .prompt { color: var(--muted); user-select: none; }
+
+  /* CTA */
+  .cta { border-bottom: none; }
+
+  .btns { display: flex; flex-direction: column; gap: 16px; }
+
+  .btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    width: 100%;
+    padding: 30px 34px;
+    font-size: clamp(1.2rem, 3.2vw, 1.65rem);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: var(--accent-on);
+    background: var(--accent);
+    border-radius: var(--radius);
+    text-decoration: none;
+    transition: background 0.45s ease, color 0.45s ease;
+  }
+
+  .btn:focus-visible { outline: 2px solid var(--text); outline-offset: 4px; }
+
+  .card-link:focus-visible, .rows-value:focus-visible, .foot-link:focus-visible {
+    outline: 2px solid var(--accent-ink);
+    outline-offset: 4px;
+    border-radius: 4px;
+  }
+
+  footer {
+    padding-bottom: 48px;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+
+  footer .container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px 16px;
+  }
+
+  .foot-link { color: var(--muted); text-decoration: none; transition: color 0.35s ease; }
+
+  @media (hover: hover) {
+    .lang:hover, .theme:hover { border-color: var(--muted); }
+    .card:hover {
+      transform: translateY(-3px);
+      border-color: var(--hover-line);
+      box-shadow: 0 20px 40px -24px var(--shadow);
+    }
+    .card-link:hover { text-decoration: underline; text-underline-offset: 4px; }
+    .card-link:hover .arrow { transform: translate(2px, -2px); }
+    a.rows-value:hover { color: var(--accent-ink); }
+    a.rows-value:hover .arrow { color: var(--accent-ink); transform: translate(2px, -2px); }
+    .foot-link:hover { color: var(--accent-ink); }
+    .btn:hover { background: var(--inv-bg); color: var(--inv-fg); }
+    .btn:hover .arrow { transform: translateX(8px); }
+  }
+
+  @media (max-width: 720px) {
+    .container {
+      padding-left: max(20px, env(safe-area-inset-left, 0px));
+      padding-right: max(20px, env(safe-area-inset-right, 0px));
+    }
+    .controls { top: calc(12px + env(safe-area-inset-top, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); gap: 6px; }
+    .grid { grid-template-columns: 1fr; }
+    .card { padding: 22px; }
+    .rows li { flex-direction: column; align-items: flex-start; gap: 4px; padding: 16px 0; }
+    .rows-value { text-align: left; }
+    th, td { padding: 14px 16px; }
+    pre { padding: 18px; }
+    pre.menu { font-size: 0.78rem; }
+    .btn { padding: 24px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="controls">
+  <button class="theme" id="theme-toggle" type="button" role="switch" aria-checked="true" aria-label="Dark theme">
+    <span class="theme-thumb" aria-hidden="true"></span>
+    <span class="theme-opt sun" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+    </span>
+    <span class="theme-opt moon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </span>
+  </button>
+
+  <button class="lang" id="lang-toggle" type="button" aria-label="Переключить на русский" data-current="en">
+    <span class="lang-thumb" aria-hidden="true"></span>
+    <span class="lang-opt is-active" data-lang="en">EN</span>
+    <span class="lang-opt" data-lang="ru">RU</span>
+  </button>
+</div>
+
+<header class="hero">
+  <div class="container">
+    <h1><span>Portfolio Bot</span><span class="second">Login Alert Bot</span></h1>
+    <span class="tag">Python · Telegram · Bots</span>
+  </div>
+</header>
+
+<main>
+  <section class="about">
+    <div class="container">
+      <h2 data-i18n="about_title">About</h2>
+      <p data-i18n="about_text">Two Telegram bots in Python. One is a portfolio you can chat with. The other watches your server and reports every login.</p>
+    </div>
+  </section>
+
+  <section class="bots">
+    <div class="container">
+      <h2 data-i18n="bots_title">Bots</h2>
+      <div class="grid">
+
+        <article class="card">
+          <h3>Portfolio Bot</h3>
+          <p data-i18n="pf_text">An interactive portfolio. Inline menus show the projects, the Arch Linux setup and the websites. Visitors can write to the author through the bot, and the author replies from the same chat.</p>
+          <p class="stack">Python · aiogram · SQLite</p>
+          <div class="card-meta">
+            <p class="count" data-lines="270">Project code: 270 lines</p>
+          </div>
+        </article>
+
+        <article class="card">
+          <h3>Login Alert Bot</h3>
+          <p data-i18n="la_text">Follows the SSH log and sends a Telegram alert for each login, failed attempt, sudo or su failure. Each alert has the country, ISP, proxy and VPN flags, reverse DNS and a map pin.</p>
+          <p class="stack">Python · requests · journalctl</p>
+          <div class="card-meta">
+            <p class="count" data-lines="447">Project code: 447 lines</p>
+          </div>
+        </article>
+
+      </div>
+    </div>
+  </section>
+
+  <section class="diff">
+    <div class="container">
+      <h2 data-i18n="diff_title">The difference</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col"></th>
+              <th scope="col">Portfolio Bot</th>
+              <th scope="col">Login Alert Bot</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row" data-i18n="row_for">Made for</th>
+              <td data-i18n="for_pf">Visitors of the portfolio</td>
+              <td data-i18n="for_la">The server admin</td>
+            </tr>
+            <tr>
+              <th scope="row" data-i18n="row_gets">Gets its data from</th>
+              <td data-i18n="gets_pf">Telegram polling</td>
+              <td data-i18n="gets_la">journalctl -f or a log file</td>
+            </tr>
+            <tr>
+              <th scope="row" data-i18n="row_lib">Library</th>
+              <td>aiogram</td>
+              <td>requests</td>
+            </tr>
+            <tr>
+              <th scope="row" data-i18n="row_store">Stores</th>
+              <td data-i18n="store_pf">User list in users.db</td>
+              <td data-i18n="store_la">Nothing on disk</td>
+            </tr>
+            <tr>
+              <th scope="row" data-i18n="row_access">Needs</th>
+              <td data-i18n="acc_pf">A bot token</td>
+              <td data-i18n="acc_la">Root or group adm / systemd-journal</td>
+            </tr>
+            <tr>
+              <th scope="row" data-i18n="row_code">Code</th>
+              <td data-lines="270" data-short="1">270 lines</td>
+              <td data-lines="447" data-short="1">447 lines</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="menu-section">
+    <div class="container">
+      <h2 data-i18n="menu_title">Portfolio Bot menu</h2>
+      <pre class="menu"><code>/start
+├─ My Projects (Python)   → SysPulse · FastSysPulse · NetPulse
+├─ My Linux Setup (Arch)
+├─ Official GitHub Profile
+├─ Official GitHub Site   → open in Telegram or in the browser
+└─ Contact Me             → write a message, the author gets it</code></pre>
+      <p class="run-text" data-i18n="menu_text">Any text a visitor sends to the chat is forwarded to the author. The author answers by replying to the forwarded message.</p>
+    </div>
+  </section>
+
+  <section class="alerts">
+    <div class="container">
+      <h2 data-i18n="alerts_title">Alerts</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col" data-i18n="col_event">Event</th>
+              <th scope="col" data-i18n="col_alert">Alert title</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row" data-i18n="ev_ok">Accepted login</th>
+              <td class="cmd wrap">SUCCESSFUL LOGIN</td>
+            </tr>
+            <tr>
+              <th scope="row" data-i18n="ev_fail">Failed password or key</th>
+              <td class="cmd wrap">LOGIN ATTEMPT REJECTED</td>
+            </tr>
+            <tr>
+              <th scope="row" data-i18n="ev_max">Too many authentication attempts</th>
+              <td class="cmd wrap">REJECTED: MAX AUTH ATTEMPTS EXCEEDED</td>
+            </tr>
+            <tr>
+              <th scope="row" data-i18n="ev_drop">Connection closed before login</th>
+              <td class="cmd wrap">CONNECTION DROPPED BEFORE AUTH</td>
+            </tr>
+            <tr>
+              <th scope="row" data-i18n="ev_scan">No banner, failed negotiation, reset connection</th>
+              <td class="cmd wrap">SUSPICIOUS CONNECTION / SCAN</td>
+            </tr>
+            <tr>
+              <th scope="row" data-i18n="ev_sudo">Failed sudo</th>
+              <td class="cmd wrap">SUDO AUTHENTICATION FAILED</td>
+            </tr>
+            <tr>
+              <th scope="row" data-i18n="ev_su">Failed su</th>
+              <td class="cmd wrap">SU AUTHENTICATION FAILED</td>
+            </tr>
+            <tr>
+              <th scope="row" data-i18n="ev_brute">5 or more failures from one IP in 10 minutes</th>
+              <td class="cmd wrap">BRUTE-FORCE ATTACK DETECTED</td>
+            </tr>
+            <tr>
+              <th scope="row" data-i18n="ev_after">Login after 3 or more failures from the same IP</th>
+              <td class="cmd wrap">SUCCESSFUL LOGIN AFTER MANY FAILURES</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="run-text" data-i18n="alerts_note">To avoid floods, failures are reported at the 1st, 5th, 10th, 25th, 50th, 100th, 250th and 500th attempt per IP, then every 500.</p>
+    </div>
+  </section>
+
+  <section class="settings">
+    <div class="container">
+      <h2 data-i18n="settings_title">Login Alert Bot settings</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col" data-i18n="col_var">Variable</th>
+              <th scope="col" data-i18n="col_default">Default</th>
+              <th scope="col" data-i18n="col_meaning">Meaning</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="cmd">LOG_SOURCE</td>
+              <td class="cmd">journal</td>
+              <td data-i18n="s_source">journal or file</td>
+            </tr>
+            <tr>
+              <td class="cmd">LOG_FILE</td>
+              <td class="cmd">/var/log/auth.log</td>
+              <td data-i18n="s_file">Log path when LOG_SOURCE is file. Use /var/log/secure on RHEL and CentOS.</td>
+            </tr>
+            <tr>
+              <td class="cmd">IGNORE_IPS</td>
+              <td data-i18n="s_empty">empty</td>
+              <td data-i18n="s_ignore">IP addresses to skip, separated by commas</td>
+            </tr>
+            <tr>
+              <td class="cmd">BRUTE_THRESHOLD</td>
+              <td class="cmd">5</td>
+              <td data-i18n="s_thr">Failures in the window that count as brute force</td>
+            </tr>
+            <tr>
+              <td class="cmd">BRUTE_WINDOW</td>
+              <td class="cmd">600</td>
+              <td data-i18n="s_win">Window length in seconds</td>
+            </tr>
+            <tr>
+              <td class="cmd">SEND_LOCATION_PIN</td>
+              <td class="cmd">1</td>
+              <td data-i18n="s_pin">Send a map pin for logins and brute force</td>
+            </tr>
+            <tr>
+              <td class="cmd">NOTIFY_PRIVATE</td>
+              <td class="cmd">1</td>
+              <td data-i18n="s_priv">Alert on sources from the local network and loopback</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="run">
+    <div class="container">
+      <h2 data-i18n="run_title">Run</h2>
+      <pre><code><span class="prompt">$ </span>pip install aiogram requests
+<span class="prompt">$ </span>python bot.py
+<span class="prompt">$ </span>python3 ssh_bot.py --test
+<span class="prompt">$ </span>python3 ssh_bot.py</code></pre>
+      <p class="run-text" data-i18n="run_need">Needs Python 3. Portfolio Bot needs aiogram 3 and BOT_TOKEN in the environment or in a .env file. Login Alert Bot needs requests, a bot token and chat ID set near the top of the script, and root or the adm / systemd-journal group to read the logs. The --test flag prints sample alerts and sends nothing.</p>
+      <p class="run-text" data-i18n="run_warn">Keep tokens out of the code and out of git. Add .env to .gitignore.</p>
+    </div>
+  </section>
+
+  <section class="cta">
+    <div class="container">
+      <a class="btn" href="https://github.com/mraz0tix-code" target="_blank" rel="noopener noreferrer">
+        <span data-i18n="cta">Projects on GitHub</span>
+        <span class="arrow" aria-hidden="true">→</span>
+      </a>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="container">
+    <span>© mraz0tix</span>
+    <a class="foot-link" href="https://mraz0tix-code.github.io/" target="_blank" rel="noopener noreferrer" data-i18n="foot_back">Portfolio</a>
+  </div>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+
+  var dict = {
+    ru: {
+      about_title: 'О проекте',
+      about_text: 'Два Telegram-бота на Python. Один — портфолио, с которым можно общаться. Другой следит за сервером и сообщает о каждом входе.',
+      bots_title: 'Боты',
+      pf_text: 'Интерактивное портфолио. Меню с кнопками показывает проекты, настройку Arch Linux и сайты. Посетители могут написать автору через бота, а автор отвечает из того же чата.',
+      la_text: 'Следит за журналом SSH и присылает в Telegram уведомление о каждом входе, неудачной попытке и ошибке sudo или su. В уведомлении есть страна, провайдер, признаки прокси и VPN, обратный DNS и точка на карте.',
+      diff_title: 'Чем отличаются',
+      row_for: 'Для кого',
+      for_pf: 'Посетители портфолио',
+      for_la: 'Администратор сервера',
+      row_gets: 'Откуда берёт данные',
+      gets_pf: 'Опрос Telegram',
+      gets_la: 'journalctl -f или файл журнала',
+      row_lib: 'Библиотека',
+      row_store: 'Что хранит',
+      store_pf: 'Список пользователей в users.db',
+      store_la: 'Ничего на диске',
+      row_access: 'Что нужно',
+      acc_pf: 'Токен бота',
+      acc_la: 'root или группа adm / systemd-journal',
+      row_code: 'Код',
+      menu_title: 'Меню Portfolio Bot',
+      menu_text: 'Любой текст, который посетитель отправил в чат, бот пересылает автору. Автор отвечает ответом на пересланное сообщение.',
+      alerts_title: 'Уведомления',
+      col_event: 'Событие',
+      col_alert: 'Заголовок уведомления',
+      ev_ok: 'Успешный вход',
+      ev_fail: 'Неверный пароль или ключ',
+      ev_max: 'Слишком много попыток входа',
+      ev_drop: 'Соединение закрыто до входа',
+      ev_scan: 'Нет баннера, сбой согласования, сброс соединения',
+      ev_sudo: 'Неудачный sudo',
+      ev_su: 'Неудачный su',
+      ev_brute: '5 и больше неудач с одного IP за 10 минут',
+      ev_after: 'Вход после 3 и больше неудач с того же IP',
+      alerts_note: 'Чтобы не засыпать чат, неудачи сообщаются на 1, 5, 10, 25, 50, 100, 250 и 500-й попытке с одного IP, дальше каждые 500.',
+      settings_title: 'Настройки Login Alert Bot',
+      col_var: 'Переменная',
+      col_default: 'По умолчанию',
+      col_meaning: 'Что делает',
+      s_source: 'journal или file',
+      s_file: 'Путь к журналу, если LOG_SOURCE равен file. На RHEL и CentOS это /var/log/secure.',
+      s_empty: 'пусто',
+      s_ignore: 'IP-адреса, которые нужно пропускать, через запятую',
+      s_thr: 'Сколько неудач в окне считается подбором пароля',
+      s_win: 'Длина окна в секундах',
+      s_pin: 'Присылать точку на карте для входов и подбора пароля',
+      s_priv: 'Уведомлять об источниках из локальной сети и loopback',
+      run_title: 'Запуск',
+      run_need: 'Нужен Python 3. Для Portfolio Bot нужны aiogram 3 и BOT_TOKEN в окружении или в файле .env. Для Login Alert Bot нужны requests, токен бота и ID чата в начале скрипта, а также root или группа adm / systemd-journal, чтобы читать журналы. Флаг --test печатает пробные уведомления и ничего не отправляет.',
+      run_warn: 'Не храните токены в коде и в git. Добавьте .env в .gitignore.',
+      cta: 'Проекты на GitHub',
+      foot_back: 'Портфолио',
+      theme_label: 'Тёмная тема'
+    },
+    en: {
+      about_title: 'About',
+      about_text: 'Two Telegram bots in Python. One is a portfolio you can chat with. The other watches your server and reports every login.',
+      bots_title: 'Bots',
+      pf_text: 'An interactive portfolio. Inline menus show the projects, the Arch Linux setup and the websites. Visitors can write to the author through the bot, and the author replies from the same chat.',
+      la_text: 'Follows the SSH log and sends a Telegram alert for each login, failed attempt, sudo or su failure. Each alert has the country, ISP, proxy and VPN flags, reverse DNS and a map pin.',
+      diff_title: 'The difference',
+      row_for: 'Made for',
+      for_pf: 'Visitors of the portfolio',
+      for_la: 'The server admin',
+      row_gets: 'Gets its data from',
+      gets_pf: 'Telegram polling',
+      gets_la: 'journalctl -f or a log file',
+      row_lib: 'Library',
+      row_store: 'Stores',
+      store_pf: 'User list in users.db',
+      store_la: 'Nothing on disk',
+      row_access: 'Needs',
+      acc_pf: 'A bot token',
+      acc_la: 'Root or group adm / systemd-journal',
+      row_code: 'Code',
+      menu_title: 'Portfolio Bot menu',
+      menu_text: 'Any text a visitor sends to the chat is forwarded to the author. The author answers by replying to the forwarded message.',
+      alerts_title: 'Alerts',
+      col_event: 'Event',
+      col_alert: 'Alert title',
+      ev_ok: 'Accepted login',
+      ev_fail: 'Failed password or key',
+      ev_max: 'Too many authentication attempts',
+      ev_drop: 'Connection closed before login',
+      ev_scan: 'No banner, failed negotiation, reset connection',
+      ev_sudo: 'Failed sudo',
+      ev_su: 'Failed su',
+      ev_brute: '5 or more failures from one IP in 10 minutes',
+      ev_after: 'Login after 3 or more failures from the same IP',
+      alerts_note: 'To avoid floods, failures are reported at the 1st, 5th, 10th, 25th, 50th, 100th, 250th and 500th attempt per IP, then every 500.',
+      settings_title: 'Login Alert Bot settings',
+      col_var: 'Variable',
+      col_default: 'Default',
+      col_meaning: 'Meaning',
+      s_source: 'journal or file',
+      s_file: 'Log path when LOG_SOURCE is file. Use /var/log/secure on RHEL and CentOS.',
+      s_empty: 'empty',
+      s_ignore: 'IP addresses to skip, separated by commas',
+      s_thr: 'Failures in the window that count as brute force',
+      s_win: 'Window length in seconds',
+      s_pin: 'Send a map pin for logins and brute force',
+      s_priv: 'Alert on sources from the local network and loopback',
+      run_title: 'Run',
+      run_need: 'Needs Python 3. Portfolio Bot needs aiogram 3 and BOT_TOKEN in the environment or in a .env file. Login Alert Bot needs requests, a bot token and chat ID set near the top of the script, and root or the adm / systemd-journal group to read the logs. The --test flag prints sample alerts and sends nothing.',
+      run_warn: 'Keep tokens out of the code and out of git. Add .env to .gitignore.',
+      cta: 'Projects on GitHub',
+      foot_back: 'Portfolio',
+      theme_label: 'Dark theme'
+    }
+  };
+
+  var root = document.documentElement;
+  var toggle = document.getElementById('lang-toggle');
+  var options = toggle.querySelectorAll('[data-lang]');
+  var themeBtn = document.getElementById('theme-toggle');
+  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var lightQuery = window.matchMedia('(prefers-color-scheme: light)');
+  var current = 'en';
+  var timer = null;
+  var themeTimer = null;
+
+  function ruLines(n) {
+    var d = n % 10, dd = n % 100;
+    if (d === 1 && dd !== 11) return 'строка';
+    if (d >= 2 && d <= 4 && (dd < 12 || dd > 14)) return 'строки';
+    return 'строк';
+  }
+
+  function renderLines(lang) {
+    document.querySelectorAll('[data-lines]').forEach(function (el) {
+      var n = parseInt(el.getAttribute('data-lines'), 10);
+      var short = el.hasAttribute('data-short');
+      if (lang === 'en') {
+        el.textContent = (short ? '' : 'Project code: ') + n + (n === 1 ? ' line' : ' lines');
+      } else {
+        el.textContent = (short ? '' : 'Код проекта: ') + n + ' ' + ruLines(n);
+      }
+    });
+  }
+
+  function render(lang) {
+    document.querySelectorAll('[data-i18n]').forEach(function (el) {
+      var text = dict[lang][el.getAttribute('data-i18n')];
+      if (text) el.textContent = text;
+    });
+    renderLines(lang);
+    themeBtn.setAttribute('aria-label', dict[lang].theme_label);
+    root.lang = lang;
+  }
+
+  function markActive(lang) {
+    toggle.setAttribute('data-current', lang);
+    options.forEach(function (o) {
+      o.classList.toggle('is-active', o.getAttribute('data-lang') === lang);
+    });
+    toggle.setAttribute('aria-label', lang === 'ru' ? 'Switch to English' : 'Переключить на русский');
+  }
+
+  function setLang(lang) {
+    if (lang === current) return;
+    current = lang;
+    markActive(lang);
+
+    var nodes = document.querySelectorAll('[data-i18n], [data-lines]');
+    nodes.forEach(function (n) { n.classList.add('is-fading'); });
+
+    clearTimeout(timer);
+    timer = setTimeout(function () {
+      render(lang);
+      nodes.forEach(function (n) { n.classList.remove('is-fading'); });
+    }, reduceMotion ? 0 : 230);
+  }
+
+  function isDark() {
+    var t = root.getAttribute('data-theme');
+    if (t === 'dark') return true;
+    if (t === 'light') return false;
+    return !lightQuery.matches;
+  }
+
+  function syncTheme() {
+    themeBtn.setAttribute('aria-checked', isDark() ? 'true' : 'false');
+  }
+
+  function setTheme(theme) {
+    if (!reduceMotion) {
+      root.classList.add('theme-anim');
+      clearTimeout(themeTimer);
+      themeTimer = setTimeout(function () { root.classList.remove('theme-anim'); }, 500);
+    }
+    root.setAttribute('data-theme', theme);
+    syncTheme();
+    try { localStorage.setItem('theme', theme); } catch (e) {}
+  }
+
+  markActive('en');
+  render('en');
+  syncTheme();
+
+  toggle.addEventListener('click', function () {
+    setLang(current === 'ru' ? 'en' : 'ru');
+  });
+
+  themeBtn.addEventListener('click', function () {
+    setTheme(isDark() ? 'light' : 'dark');
+  });
+
+  if (lightQuery.addEventListener) lightQuery.addEventListener('change', syncTheme);
+})();
+</script>
+
+</body>
+</html>
